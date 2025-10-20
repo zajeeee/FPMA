@@ -17,12 +17,21 @@ class _QrScannerPageState extends State<QrScannerPage> {
   bool _isScanning = true;
   bool _isValidating = false;
   Map<String, dynamic>? _lastValidationResult;
+  String? _lastScannedCode;
+  DateTime? _lastScanTime;
 
   @override
   void initState() {
     super.initState();
     // Start scanning immediately
     _isScanning = true;
+
+    // Configure scanner for better QR detection
+    cameraController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
   }
 
   @override
@@ -114,7 +123,26 @@ class _QrScannerPageState extends State<QrScannerPage> {
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       if (barcode.rawValue != null && _isScanning && !_isValidating) {
-        _validateCertificateByQr(barcode.rawValue!);
+        final qrCode = barcode.rawValue!;
+        final now = DateTime.now();
+
+        // Debounce: prevent scanning the same QR code multiple times
+        if (_lastScannedCode == qrCode &&
+            _lastScanTime != null &&
+            now.difference(_lastScanTime!).inSeconds < 3) {
+          return; // Skip if same QR code scanned within 3 seconds
+        }
+
+        // Update last scan info
+        _lastScannedCode = qrCode;
+        _lastScanTime = now;
+
+        // Add a small delay to ensure QR code is stable
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _isScanning && !_isValidating) {
+            _validateCertificateByQr(qrCode);
+          }
+        });
         break;
       }
     }
@@ -124,6 +152,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
     setState(() {
       _isScanning = true;
       _lastValidationResult = null;
+      _lastScannedCode = null;
+      _lastScanTime = null;
     });
   }
 
@@ -288,10 +318,30 @@ class _QrScannerPageState extends State<QrScannerPage> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Automatically scanning for QR codes...',
+                            'Hold steady and wait for detection...',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.green, width: 1),
+                            ),
+                            child: const Text(
+                              'Ready to scan',
+                              style: TextStyle(
+                                color: Colors.green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],

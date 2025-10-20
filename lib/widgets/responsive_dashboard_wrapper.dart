@@ -236,6 +236,12 @@ class _ResponsiveDashboardWrapperState
     if (_userRole == null) return;
 
     final items = _getNavigationItems(_userRole!);
+
+    // Ensure index is within bounds
+    if (index < 0 || index >= items.length) {
+      return;
+    }
+
     final isLogout = index == items.length - 1;
 
     if (isLogout) {
@@ -260,6 +266,11 @@ class _ResponsiveDashboardWrapperState
         _showLogoutConfirmation();
       });
       // Return current page while logout confirmation is showing
+      return _getCurrentPage(role);
+    }
+
+    // Ensure index is within bounds
+    if (index < 0 || index >= navigationItems.length - 1) {
       return _getCurrentPage(role);
     }
 

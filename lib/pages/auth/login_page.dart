@@ -58,7 +58,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             type: ToastificationType.success,
             style: ToastificationStyle.flat,
             title: const Text('Login Successful'),
-            description: const Text('Welcome to FPMS Libasport!'),
+            description: const Text('Welcome to FPM Libasport!'),
             alignment: Alignment.topRight,
             autoCloseDuration: const Duration(seconds: 3),
           );
@@ -134,7 +134,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 32),
               Text(
-                'FPMS Libasport',
+                'FPM Libasport',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
@@ -142,7 +142,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 12),
               Text(
-                'Fish Product Monitoring System',
+                'Fish Product Monitoring',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: Theme.of(
                     context,
@@ -211,7 +211,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 24),
         Text(
-          'FPMS Libasport',
+          'FPM Libasport',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: Theme.of(context).colorScheme.primary,
@@ -219,7 +219,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 8),
         Text(
-          'Fish Product Monitoring System',
+          'Fish Product Monitoring',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: Theme.of(
               context,

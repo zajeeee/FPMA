@@ -1,11 +1,11 @@
 {
-    "name": "FPMS Libasport",
-    "short_name": "FPMS",
+    "name": "FPM Libasport - Fish Product Monitoring",
+    "short_name": "FPM Libasport",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Fish Product Monitoring System for Libasport",
+    "description": "Fish Product Monitoring ",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

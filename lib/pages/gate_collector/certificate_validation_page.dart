@@ -18,12 +18,21 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
   bool _isScanning = true;
   bool _isValidating = false;
   Map<String, dynamic>? _lastValidationResult;
+  String? _lastScannedCode;
+  DateTime? _lastScanTime;
 
   @override
   void initState() {
     super.initState();
     // Start scanning immediately
     _isScanning = true;
+
+    // Configure scanner for better QR detection
+    cameraController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
   }
 
   @override
@@ -115,7 +124,26 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       if (barcode.rawValue != null && _isScanning && !_isValidating) {
-        _validateCertificateByQr(barcode.rawValue!);
+        final qrCode = barcode.rawValue!;
+        final now = DateTime.now();
+
+        // Debounce: prevent scanning the same QR code multiple times
+        if (_lastScannedCode == qrCode &&
+            _lastScanTime != null &&
+            now.difference(_lastScanTime!).inSeconds < 3) {
+          return; // Skip if same QR code scanned within 3 seconds
+        }
+
+        // Update last scan info
+        _lastScannedCode = qrCode;
+        _lastScanTime = now;
+
+        // Add a small delay to ensure QR code is stable
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _isScanning && !_isValidating) {
+            _validateCertificateByQr(qrCode);
+          }
+        });
         break;
       }
     }
@@ -125,6 +153,8 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
     setState(() {
       _isScanning = true;
       _lastValidationResult = null;
+      _lastScannedCode = null;
+      _lastScanTime = null;
     });
   }
 

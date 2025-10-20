@@ -445,7 +445,7 @@ class _GateCollectorDashboardState extends State<GateCollectorDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Certificate: ${activity.certificateId.substring(0, 8)}...',
+                    'Certificate: ${activity.certificateId.length > 8 ? activity.certificateId.substring(0, 8) : activity.certificateId}...',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),

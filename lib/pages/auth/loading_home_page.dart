@@ -134,11 +134,10 @@ class _LoadingHomePageState extends State<LoadingHomePage>
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: Image.asset(
-                    'assets/R.png',
-                    width: isMobile ? 70 : 92,
-                    height: isMobile ? 70 : 92,
-                    fit: BoxFit.contain,
+                  child: Icon(
+                    Icons.water_drop,
+                    size: isMobile ? 70 : 92,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -243,7 +242,7 @@ class _LoadingHomePageState extends State<LoadingHomePage>
                             }
                           },
                   child: Text(
-                    'SIGN IN / LOG IN',
+                    'SIGN IN',
                     style: GoogleFonts.poppins(
                       fontSize: isMobile ? 16 : 18,
                       fontWeight: FontWeight.w700,

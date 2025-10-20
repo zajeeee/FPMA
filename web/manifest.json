@@ -1,11 +1,11 @@
 {
-    "name": "fpms_libasport",
-    "short_name": "fpms_libasport",
+    "name": "FPM Libasport - Fish Product Monitoring",
+    "short_name": "FPM Libasport",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Fish Product Monitoring System",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

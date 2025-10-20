@@ -38,15 +38,33 @@ class GateService {
     required String gateCollectorName,
   }) async {
     try {
-      // Find certificate by QR code
-      final certificateResponse =
-          await _supabase
-              .from('clearing_certificates')
-              .select()
-              .eq('qr_code', qrCode)
-              .single();
+      // Find certificate by QR code - use safer approach to avoid single() exception
+      final certificateResponse = await _supabase
+          .from('clearing_certificates')
+          .select()
+          .eq('qr_code', qrCode);
 
-      final certificate = ClearingCertificate.fromJson(certificateResponse);
+      // Check if any certificates were found
+      if (certificateResponse.isEmpty) {
+        // Log failed validation attempt
+        await _logActivity(
+          certificateId: 'unknown',
+          gateCollectorId: gateCollectorId,
+          gateCollectorName: gateCollectorName,
+          validationResult: 'fail',
+          message: 'QR code not found in database',
+        );
+
+        return {
+          'success': false,
+          'message': 'QR code not found or invalid',
+          'error': 'Certificate not found',
+        };
+      }
+
+      final certificate = ClearingCertificate.fromJson(
+        certificateResponse.first,
+      );
 
       // Check if certificate is valid
       bool isValid = false;
