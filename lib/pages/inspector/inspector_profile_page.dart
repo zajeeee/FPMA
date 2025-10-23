@@ -4,6 +4,7 @@ import 'package:toastification/toastification.dart';
 import '../../models/user_profile.dart';
 import '../../models/user_role.dart';
 import '../../services/user_service.dart';
+import '../../widgets/change_password_modal.dart';
 import '../auth/login_page.dart';
 
 class InspectorProfilePage extends StatefulWidget {
@@ -528,23 +529,16 @@ class _InspectorProfilePageState extends State<InspectorProfilePage> {
                                   ],
                                 ),
                                 const SizedBox(height: 20),
-                                // Change Password Button (placeholder)
+                                // Change Password Button
                                 SizedBox(
                                   width: double.infinity,
                                   child: OutlinedButton.icon(
                                     onPressed: () {
-                                      toastification.show(
+                                      showDialog(
                                         context: context,
-                                        type: ToastificationType.info,
-                                        style: ToastificationStyle.flat,
-                                        title: const Text('Coming Soon'),
-                                        description: const Text(
-                                          'Password change feature will be available soon',
-                                        ),
-                                        alignment: Alignment.topRight,
-                                        autoCloseDuration: const Duration(
-                                          seconds: 3,
-                                        ),
+                                        builder:
+                                            (context) =>
+                                                const ChangePasswordModal(),
                                       );
                                     },
                                     icon: const Icon(Icons.lock_outline),

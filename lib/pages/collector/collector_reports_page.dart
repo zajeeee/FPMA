@@ -17,6 +17,32 @@ class CollectorReportsPage extends StatefulWidget {
 class _CollectorReportsPageState extends State<CollectorReportsPage> {
   List<OrderOfPayment> _orders = [];
   List<OrderOfPayment> _filteredOrders = [];
+  final Map<String, Map<String, String>> _orderDetails =
+      {}; // Store vessel name and inspector name
+
+  void _showQRCode(String qrCode) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('QR Code'),
+            content: Center(
+              child: QRCodeWidget(
+                data: qrCode,
+                size: 200,
+                isUrl: qrCode.startsWith('http'),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
   bool _isLoading = true;
   String _searchQuery = '';
   DateTimeRange? _selectedDateRange;
@@ -75,6 +101,9 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
 
       // Debug logging removed to satisfy lints
 
+      // Load fish product details for each order
+      await _loadOrderDetails(orders);
+
       setState(() {
         _orders = orders;
         _filteredOrders = orders;
@@ -116,6 +145,33 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
           alignment: Alignment.topRight,
           autoCloseDuration: const Duration(seconds: 4),
         );
+      }
+    }
+  }
+
+  Future<void> _loadOrderDetails(List<OrderOfPayment> orders) async {
+    final client = Supabase.instance.client;
+
+    for (final order in orders) {
+      try {
+        final response =
+            await client
+                .from('fish_products')
+                .select('vessel_name, species, inspector_name')
+                .eq('id', order.fishProductId)
+                .single();
+
+        _orderDetails[order.id] = {
+          'vessel_name': response['vessel_name'] ?? 'Unknown',
+          'species': response['species'] ?? 'Unknown',
+          'inspector_name': response['inspector_name'] ?? 'Unknown',
+        };
+      } catch (e) {
+        _orderDetails[order.id] = {
+          'vessel_name': 'Unknown',
+          'species': 'Unknown',
+          'inspector_name': 'Unknown',
+        };
       }
     }
   }
@@ -261,29 +317,6 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
         );
       }
     }
-  }
-
-  void _showQRCode(String qrCode) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('QR Code'),
-            content: Center(
-              child: QRCodeWidget(
-                data: qrCode,
-                size: 200,
-                isUrl: qrCode.startsWith('http'),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-    );
   }
 
   @override
@@ -718,11 +751,19 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                                                         Text(order.orderNumber),
                                                       ),
                                                       DataCell(
-                                                        Text('Loading...'),
-                                                      ), // Will be updated
+                                                        Text(
+                                                          _orderDetails[order
+                                                                  .id]?['vessel_name'] ??
+                                                              'Loading...',
+                                                        ),
+                                                      ),
                                                       DataCell(
-                                                        Text('Loading...'),
-                                                      ), // Will be updated
+                                                        Text(
+                                                          _orderDetails[order
+                                                                  .id]?['species'] ??
+                                                              'Loading...',
+                                                        ),
+                                                      ),
                                                       DataCell(
                                                         Text(
                                                           '₱${order.amount.toStringAsFixed(2)}',
@@ -736,8 +777,12 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                                                         ),
                                                       ),
                                                       DataCell(
-                                                        Text('Loading...'),
-                                                      ), // Will be updated
+                                                        Text(
+                                                          _orderDetails[order
+                                                                  .id]?['inspector_name'] ??
+                                                              'Loading...',
+                                                        ),
+                                                      ),
                                                       DataCell(
                                                         Container(
                                                           padding:
@@ -801,25 +846,8 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                                                         ),
                                                       ),
                                                       DataCell(
-                                                        Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            if (order.qrCode !=
-                                                                null)
-                                                              IconButton(
-                                                                onPressed:
-                                                                    () => _showQRCode(
-                                                                      order
-                                                                          .qrCode!,
-                                                                    ),
-                                                                icon: const Icon(
-                                                                  Icons.qr_code,
-                                                                ),
-                                                                tooltip:
-                                                                    'View QR Code',
-                                                              ),
-                                                          ],
+                                                        Text(
+                                                          order.qrCode ?? 'N/A',
                                                         ),
                                                       ),
                                                     ],
@@ -904,12 +932,6 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                     ],
                   ),
                 ),
-                if (order.qrCode != null)
-                  IconButton(
-                    onPressed: () => _showQRCode(order.qrCode!),
-                    icon: const Icon(Icons.qr_code),
-                    tooltip: 'View QR Code',
-                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -928,8 +950,139 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showOrderDetails(order),
+                    icon: const Icon(Icons.info_outline, size: 16),
+                    label: const Text('View Details'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showOrderDetails(OrderOfPayment order) {
+    final details = _orderDetails[order.id] ?? {};
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.receipt,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Order Details',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildDetailRow('Order Number', order.orderNumber),
+                  _buildDetailRow(
+                    'Vessel Name',
+                    details['vessel_name'] ?? 'Unknown',
+                  ),
+                  _buildDetailRow(
+                    'Product Type',
+                    details['species'] ?? 'Unknown',
+                  ),
+                  _buildDetailRow(
+                    'Inspector Name',
+                    details['inspector_name'] ?? 'Unknown',
+                  ),
+                  _buildDetailRow(
+                    'Amount',
+                    '₱${order.amount.toStringAsFixed(2)}',
+                  ),
+                  _buildDetailRow('Status', order.status.toUpperCase()),
+                  _buildDetailRow(
+                    'Date Issued',
+                    order.createdAt.toIso8601String().split('T')[0],
+                  ),
+                  if (order.quantity != null)
+                    _buildDetailRow('Quantity', '${order.quantity} pieces'),
+                  if (order.qrCode != null)
+                    _buildDetailRow('QR Code', order.qrCode!),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      if (order.qrCode != null) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              _showQRCode(order.qrCode!);
+                            },
+                            icon: const Icon(Icons.qr_code),
+                            label: const Text('View QR Code'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
       ),
     );
   }

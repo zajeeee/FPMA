@@ -4,7 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../models/fish_product.dart';
 import '../models/payment_models.dart';
-import '../models/activity_log.dart';
+import '../models/activity_log_general.dart';
 
 class ReportsService {
   static final SupabaseClient _supabase = Supabase.instance.client;
@@ -144,13 +144,15 @@ class ReportsService {
           .order('created_at', ascending: false);
 
       final logs =
-          (response as List).map((json) => ActivityLog.fromJson(json)).toList();
+          (response as List)
+              .map((json) => ActivityLogGeneral.fromJson(json))
+              .toList();
 
       final csv = StringBuffer();
 
       // CSV Header
       csv.writeln(
-        'ID,User Role,Action,Description,Reference ID,Reference Type,Created At',
+        'ID,User ID,User Role,Action,Description,Reference ID,Reference Type,Created At',
       );
 
       // CSV Data
@@ -158,6 +160,7 @@ class ReportsService {
         csv.writeln(
           [
                 log.id,
+                log.userId,
                 log.userRole,
                 log.action,
                 log.description ?? '',
@@ -216,7 +219,7 @@ class ReportsService {
 
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'FPMS_Report_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        name: 'FPM_Report_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
     } catch (e) {
       throw Exception('Failed to generate PDF: $e');
@@ -234,7 +237,7 @@ class ReportsService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            'Fish Product Monitoring System',
+            'Fish Product Monitoring',
             style: pw.TextStyle(
               fontSize: 24,
               fontWeight: pw.FontWeight.bold,
@@ -260,7 +263,7 @@ class ReportsService {
     List<FishProduct> fishProducts,
     List<OrderOfPayment> orders,
     List<OfficialReceipt> receipts,
-    List<ActivityLog> activityLogs,
+    List<ActivityLogGeneral> activityLogs,
   ) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -561,7 +564,7 @@ class ReportsService {
     );
   }
 
-  static pw.Widget _buildActivityLogsSection(List<ActivityLog> logs) {
+  static pw.Widget _buildActivityLogsSection(List<ActivityLogGeneral> logs) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
@@ -688,7 +691,7 @@ class ReportsService {
     }
   }
 
-  static Future<List<ActivityLog>> _getActivityLogs() async {
+  static Future<List<ActivityLogGeneral>> _getActivityLogs() async {
     try {
       final response = await _supabase
           .from('activity_logs')
@@ -696,7 +699,7 @@ class ReportsService {
           .order('created_at', ascending: false)
           .limit(50);
       return (response as List)
-          .map((json) => ActivityLog.fromJson(json))
+          .map((json) => ActivityLogGeneral.fromJson(json))
           .toList();
     } catch (e) {
       return [];

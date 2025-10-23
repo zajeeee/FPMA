@@ -170,6 +170,32 @@ class UserService {
     }
   }
 
+  /// Change password for current user (self-service)
+  static Future<bool> changeCurrentUserPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      // Verify current password by attempting to sign in
+      await _supabase.auth.signInWithPassword(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      // Update password using Supabase auth
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      return response.user != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Update user profile (admin only)
   static Future<bool> updateUserProfile({
     required String userId,

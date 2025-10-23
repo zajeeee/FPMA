@@ -1,5 +1,4 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/activity_log.dart';
 import '../models/activity_log_general.dart';
 
 class ActivityLogService {
@@ -36,7 +35,7 @@ class ActivityLogService {
   }
 
   /// Get activity logs with pagination
-  static Future<List<ActivityLog>> getActivityLogs({
+  static Future<List<ActivityLogGeneral>> getActivityLogs({
     int limit = 50,
     int offset = 0,
     String? action,
@@ -62,7 +61,7 @@ class ActivityLogService {
           .range(offset, offset + limit - 1);
 
       return (response as List)
-          .map((json) => ActivityLog.fromJson(json))
+          .map((json) => ActivityLogGeneral.fromJson(json))
           .toList();
     } catch (e) {
       return [];
@@ -70,7 +69,7 @@ class ActivityLogService {
   }
 
   /// Get activity logs for a specific user
-  static Future<List<ActivityLog>> getUserActivityLogs(
+  static Future<List<ActivityLogGeneral>> getUserActivityLogs(
     String userId, {
     int limit = 50,
     int offset = 0,
@@ -85,7 +84,7 @@ class ActivityLogService {
           .range(offset, offset + limit - 1);
 
       return (response as List)
-          .map((json) => ActivityLog.fromJson(json))
+          .map((json) => ActivityLogGeneral.fromJson(json))
           .toList();
     } catch (e) {
       return [];
@@ -148,7 +147,9 @@ class ActivityLogService {
   }
 
   /// Get recent activities (last 24 hours)
-  static Future<List<ActivityLog>> getRecentActivities({int limit = 10}) async {
+  static Future<List<ActivityLogGeneral>> getRecentActivities({
+    int limit = 10,
+  }) async {
     try {
       final yesterday = DateTime.now().subtract(const Duration(days: 1));
 
@@ -160,7 +161,7 @@ class ActivityLogService {
           .limit(limit);
 
       return (response as List)
-          .map((json) => ActivityLog.fromJson(json))
+          .map((json) => ActivityLogGeneral.fromJson(json))
           .toList();
     } catch (e) {
       return [];

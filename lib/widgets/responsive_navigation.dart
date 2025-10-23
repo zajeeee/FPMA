@@ -90,7 +90,7 @@ class _DesktopLayout extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'FPMS',
+                        'FPM',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,

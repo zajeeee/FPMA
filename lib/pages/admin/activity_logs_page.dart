@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
-import '../../models/activity_log.dart';
+import '../../models/activity_log_general.dart';
 import '../../services/activity_log_service.dart';
 
 class ActivityLogsPage extends StatefulWidget {
@@ -11,7 +11,7 @@ class ActivityLogsPage extends StatefulWidget {
 }
 
 class _ActivityLogsPageState extends State<ActivityLogsPage> {
-  List<ActivityLog> _activityLogs = [];
+  List<ActivityLogGeneral> _activityLogs = [];
   bool _isLoading = true;
   String _selectedAction = 'All Actions';
   String _selectedRole = 'All Roles';
@@ -30,6 +30,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     'user_created',
     'user_updated',
     'user_deactivated',
+    'Password Changed',
     'login',
     'logout',
   ];
