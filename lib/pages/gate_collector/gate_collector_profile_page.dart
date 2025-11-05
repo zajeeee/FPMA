@@ -4,8 +4,8 @@ import 'package:toastification/toastification.dart';
 import '../../models/user_profile.dart';
 import '../../models/user_role.dart';
 import '../../services/user_service.dart';
+import '../../services/logout_service.dart';
 import '../../widgets/change_password_modal.dart';
-import '../auth/login_page.dart';
 
 class GateCollectorProfilePage extends StatefulWidget {
   const GateCollectorProfilePage({super.key});
@@ -158,47 +158,7 @@ class _GateCollectorProfilePageState extends State<GateCollectorProfilePage> {
   }
 
   Future<void> _signOut() async {
-    try {
-      await Supabase.instance.client.auth.signOut();
-      if (mounted) {
-        toastification.show(
-          context: context,
-          type: ToastificationType.info,
-          style: ToastificationStyle.flat,
-          title: const Text('Logged Out'),
-          description: const Text('You have been logged out successfully'),
-          alignment: Alignment.topRight,
-          autoCloseDuration: const Duration(seconds: 3),
-        );
-
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder:
-                (context, animation, secondaryAnimation) => const LoginPage(),
-            transitionsBuilder: (
-              context,
-              animation,
-              secondaryAnimation,
-              child,
-            ) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        toastification.show(
-          context: context,
-          type: ToastificationType.error,
-          style: ToastificationStyle.flat,
-          title: const Text('Error'),
-          description: const Text('Failed to logout'),
-          alignment: Alignment.topRight,
-          autoCloseDuration: const Duration(seconds: 4),
-        );
-      }
-    }
+    await LogoutService.logout(context);
   }
 
   @override

@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/payment_models.dart';
 import '../models/activity_log.dart';
+import 'activity_log_service.dart';
+import 'user_service.dart';
 
 class GateService {
   static final SupabaseClient _supabase = Supabase.instance.client;
@@ -38,11 +41,97 @@ class GateService {
     required String gateCollectorName,
   }) async {
     try {
+      // Trim and normalize QR code to handle whitespace issues
+      final normalizedQrCode = qrCode.trim();
+
+      if (normalizedQrCode.isEmpty) {
+        return {
+          'success': false,
+          'message': 'QR code is empty',
+          'error': 'Empty QR code',
+        };
+      }
+
       // Find certificate by QR code - use safer approach to avoid single() exception
-      final certificateResponse = await _supabase
+      // Try exact match first
+      var certificateResponseList = await _supabase
           .from('clearing_certificates')
           .select()
-          .eq('qr_code', qrCode);
+          .eq('qr_code', normalizedQrCode);
+
+      List<dynamic> certificateResponse = List<Map<String, dynamic>>.from(
+        certificateResponseList,
+      );
+
+      // If no exact match, try to extract certificate number from QR code data
+      // QR code format: CC-{certificateNumber}-{timestamp}
+      String? extractedCertNumber;
+      if (certificateResponse.isEmpty && normalizedQrCode.startsWith('CC-')) {
+        final parts = normalizedQrCode.split('-');
+        if (parts.length >= 3) {
+          // Extract certificate number (everything between first CC and last timestamp)
+          // Format: CC-certNumber-timestamp, so we need parts[1] to parts[length-2]
+          final certNumberParts = parts.sublist(1, parts.length - 1);
+          extractedCertNumber = certNumberParts.join('-');
+        }
+      }
+
+      // If we extracted a certificate number, try matching by certificate_number
+      if (certificateResponse.isEmpty && extractedCertNumber != null) {
+        certificateResponseList = await _supabase
+            .from('clearing_certificates')
+            .select()
+            .eq('certificate_number', extractedCertNumber);
+        certificateResponse = List<Map<String, dynamic>>.from(
+          certificateResponseList,
+        );
+      }
+
+      // If still no match, try case-insensitive search on qr_code field
+      if (certificateResponse.isEmpty) {
+        final allCertificates =
+            await _supabase.from('clearing_certificates').select();
+
+        final allCertificatesList = List<Map<String, dynamic>>.from(
+          allCertificates,
+        );
+
+        // Filter by case-insensitive match on qr_code
+        // Also check if scanned data matches the stored data (for URLs, we check if cert number is in the scanned data)
+        certificateResponse =
+            allCertificatesList.where((cert) {
+              final storedQrCode = cert['qr_code']?.toString().trim() ?? '';
+
+              // Direct match (case-insensitive)
+              if (storedQrCode.toLowerCase() ==
+                  normalizedQrCode.toLowerCase()) {
+                return true;
+              }
+
+              // Check if stored QR is a URL and scanned data contains certificate number
+              if (storedQrCode.startsWith('http') &&
+                  extractedCertNumber != null) {
+                final storedCertNumber =
+                    cert['certificate_number']?.toString().trim() ?? '';
+                if (storedCertNumber.toLowerCase() ==
+                    extractedCertNumber.toLowerCase()) {
+                  return true;
+                }
+              }
+
+              // Check if scanned data is in stored QR code (for partial matches)
+              if (storedQrCode.toLowerCase().contains(
+                    normalizedQrCode.toLowerCase(),
+                  ) ||
+                  normalizedQrCode.toLowerCase().contains(
+                    storedQrCode.toLowerCase(),
+                  )) {
+                return true;
+              }
+
+              return false;
+            }).toList();
+      }
 
       // Check if any certificates were found
       if (certificateResponse.isEmpty) {
@@ -52,7 +141,7 @@ class GateService {
           gateCollectorId: gateCollectorId,
           gateCollectorName: gateCollectorName,
           validationResult: 'fail',
-          message: 'QR code not found in database',
+          message: 'QR code not found in database: $normalizedQrCode',
         );
 
         return {
@@ -162,14 +251,27 @@ class GateService {
     required String validationResult,
     required String message,
   }) async {
-    await _supabase.from('activity_logs').insert({
-      'certificate_id': certificateId,
-      'gate_collector_id': gateCollectorId,
-      'gate_collector_name': gateCollectorName,
-      'validation_result': validationResult,
-      'message': message,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+    try {
+      final userRole = await UserService.getUserRole(gateCollectorId);
+      if (userRole != null) {
+        await ActivityLogService.logActivity(
+          userId: gateCollectorId,
+          userRole: userRole.name,
+          action: 'certificate_validated',
+          description: 'Certificate validation: $message',
+          referenceId: certificateId,
+          referenceType: 'clearing_certificate',
+          metadata: {
+            'gate_collector_name': gateCollectorName,
+            'validation_result': validationResult,
+            'certificate_id': certificateId,
+          },
+        );
+      }
+    } catch (e) {
+      // Don't fail validation if activity logging fails
+      debugPrint('Failed to log certificate validation: $e');
+    }
   }
 
   // Get certificate details with related data

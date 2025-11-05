@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:toastification/toastification.dart';
 import '../../widgets/responsive_dashboard_wrapper.dart';
+import '../../services/activity_log_service.dart';
+import '../../services/user_service.dart';
+import 'dart:math' as math;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,6 +21,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   bool _obscurePassword = true;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _backgroundController;
 
   @override
   void initState() {
@@ -30,6 +34,11 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+
+    _backgroundController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 10000),
+    )..repeat();
   }
 
   @override
@@ -37,6 +46,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _emailController.dispose();
     _passwordController.dispose();
     _animationController.dispose();
+    _backgroundController.dispose();
     super.dispose();
   }
 
@@ -52,6 +62,26 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       );
 
       if (response.user != null) {
+        // Log login activity
+        try {
+          final userRole = await UserService.getUserRole(response.user!.id);
+          if (userRole != null) {
+            await ActivityLogService.logActivity(
+              userId: response.user!.id,
+              userRole: userRole.name,
+              action: 'login',
+              description: 'User successfully logged in',
+              metadata: {
+                'timestamp': DateTime.now().toIso8601String(),
+                'ip_address': 'unknown',
+              },
+            );
+          }
+        } catch (e) {
+          // Don't fail login if activity logging fails
+          debugPrint('Failed to log login activity: $e');
+        }
+
         if (mounted) {
           toastification.show(
             context: context,
@@ -127,7 +157,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.water_drop,
+                  Icons.directions_boat,
                   size: 80,
                   color: Theme.of(context).colorScheme.onPrimary,
                 ),
@@ -204,7 +234,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             shape: BoxShape.circle,
           ),
           child: Icon(
-            Icons.water_drop,
+            Icons.directions_boat,
             size: 60,
             color: Theme.of(context).colorScheme.onPrimary,
           ),
@@ -337,28 +367,141 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isWideScreen = constraints.maxWidth > 800;
-                      return isWideScreen
-                          ? _buildWideLayout()
-                          : _buildNarrowLayout();
-                    },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Animated fish and bubbles background
+            RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _backgroundController,
+                builder:
+                    (context, _) => CustomPaint(
+                      painter: _FishBubblesPainter(
+                        animationValue: _backgroundController.value,
+                        isMobile: MediaQuery.of(context).size.width < 800,
+                      ),
+                    ),
+              ),
+            ),
+            // Content
+            SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWideScreen = constraints.maxWidth > 800;
+                          return isWideScreen
+                              ? _buildWideLayout()
+                              : _buildNarrowLayout();
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
+  }
+}
+
+class _FishBubblesPainter extends CustomPainter {
+  _FishBubblesPainter({required this.animationValue, required this.isMobile});
+
+  final double animationValue;
+  final bool isMobile;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw floating bubbles
+    _drawBubbles(canvas, size);
+
+    // Draw subtle fish silhouettes
+    _drawFish(canvas, size);
+
+    // Draw gentle water particles
+    _drawWaterParticles(canvas, size);
+  }
+
+  void _drawBubbles(Canvas canvas, Size size) {
+    final bubblePaint =
+        Paint()
+          ..color = const Color(0xFF3F68A8).withValues(alpha: 0.15)
+          ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 8; i++) {
+      final x = (size.width * 0.1 + i * size.width * 0.1) % size.width;
+      final y = size.height - (animationValue * size.height * 2) + (i * 50);
+      final radius = 3.0 + (i % 3) * 2.0;
+
+      if (y > -50 && y < size.height + 50) {
+        canvas.drawCircle(Offset(x, y), radius, bubblePaint);
+      }
+    }
+  }
+
+  void _drawFish(Canvas canvas, Size size) {
+    final fishPaint =
+        Paint()
+          ..color = const Color(0xFF3F68A8).withValues(alpha: 0.08)
+          ..style = PaintingStyle.fill;
+
+    // Draw 3 fish silhouettes
+    for (int i = 0; i < 3; i++) {
+      final x =
+          (size.width * 0.2 + i * size.width * 0.3) +
+          math.sin(animationValue * 2 * math.pi + i) * 20;
+      final y = size.height * 0.3 + i * size.height * 0.2;
+
+      _drawFishSilhouette(canvas, Offset(x, y), fishPaint);
+    }
+  }
+
+  void _drawFishSilhouette(Canvas canvas, Offset center, Paint paint) {
+    final path = Path();
+    final fishSize = isMobile ? 15.0 : 20.0;
+
+    // Fish body (oval)
+    path.addOval(
+      Rect.fromCenter(center: center, width: fishSize * 2, height: fishSize),
+    );
+
+    // Fish tail
+    path.moveTo(center.dx - fishSize, center.dy);
+    path.lineTo(center.dx - fishSize * 1.5, center.dy - fishSize * 0.3);
+    path.lineTo(center.dx - fishSize * 1.5, center.dy + fishSize * 0.3);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawWaterParticles(Canvas canvas, Size size) {
+    final particlePaint =
+        Paint()
+          ..color = const Color(0xFF3F68A8).withValues(alpha: 0.05)
+          ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 20; i++) {
+      final x = (i * 37.0) % size.width;
+      final y =
+          (size.height * 0.8) +
+          math.sin(animationValue * 3 * math.pi + i * 0.5) * 10;
+      final radius = 1.0 + (i % 2);
+
+      canvas.drawCircle(Offset(x, y), radius, particlePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FishBubblesPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue ||
+        oldDelegate.isMobile != isMobile;
   }
 }

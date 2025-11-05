@@ -846,8 +846,27 @@ class _CollectorReportsPageState extends State<CollectorReportsPage> {
                                                         ),
                                                       ),
                                                       DataCell(
-                                                        Text(
-                                                          order.qrCode ?? 'N/A',
+                                                        OutlinedButton.icon(
+                                                          onPressed:
+                                                              () =>
+                                                                  _showOrderDetails(
+                                                                    order,
+                                                                  ),
+                                                          icon: const Icon(
+                                                            Icons.info_outline,
+                                                            size: 16,
+                                                          ),
+                                                          label: const Text(
+                                                            'View Details',
+                                                          ),
+                                                          style: OutlinedButton.styleFrom(
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  vertical: 8,
+                                                                  horizontal:
+                                                                      12,
+                                                                ),
+                                                          ),
                                                         ),
                                                       ),
                                                     ],

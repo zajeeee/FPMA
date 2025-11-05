@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 import '../../models/payment_models.dart';
-import '../../models/activity_log.dart';
 import '../../services/gate_service.dart';
 
 class GateCollectorReportsPage extends StatefulWidget {
@@ -14,7 +13,6 @@ class GateCollectorReportsPage extends StatefulWidget {
 
 class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
   List<ClearingCertificate> _certificates = [];
-  List<ActivityLog> _activityLogs = [];
   bool _isLoading = true;
   String _selectedFilter = 'all';
   DateTimeRange? _selectedDateRange;
@@ -27,6 +25,7 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       // Load certificates with error handling
@@ -37,22 +36,15 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
         certificates = [];
       }
 
-      // Load activity logs with error handling
-      List<ActivityLog> activityLogs = [];
-      try {
-        activityLogs = await GateService.getRecentActivity(limit: 100);
-      } catch (e) {
-        activityLogs = [];
-      }
-
-      setState(() {
-        _certificates = certificates;
-        _activityLogs = activityLogs;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _certificates = certificates;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         toastification.show(
           context: context,
           type: ToastificationType.error,
@@ -120,48 +112,12 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
     }).toList();
   }
 
-  List<ActivityLog> get _filteredActivityLogs {
-    return _activityLogs.where((log) {
-      final matchesFilter =
-          _selectedFilter == 'all' ||
-          (_selectedFilter == 'success' && log.validationResult == 'success') ||
-          (_selectedFilter == 'fail' && log.validationResult == 'fail');
-
-      final matchesSearch =
-          _searchQuery.isEmpty ||
-          log.message.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          log.gateCollectorName.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          );
-
-      final matchesDate =
-          _selectedDateRange == null ||
-          (log.timestamp.isAfter(
-                _selectedDateRange!.start.subtract(const Duration(days: 1)),
-              ) &&
-              log.timestamp.isBefore(
-                _selectedDateRange!.end.add(const Duration(days: 1)),
-              ));
-
-      return matchesFilter && matchesSearch && matchesDate;
-    }).toList();
-  }
-
   Map<String, int> get _certificateStats {
     return {
       'total': _certificates.length,
       'generated': _certificates.where((c) => c.status == 'generated').length,
       'validated': _certificates.where((c) => c.status == 'validated').length,
       'expired': _certificates.where((c) => c.status == 'expired').length,
-    };
-  }
-
-  Map<String, int> get _activityStats {
-    return {
-      'total': _activityLogs.length,
-      'success':
-          _activityLogs.where((a) => a.validationResult == 'success').length,
-      'fail': _activityLogs.where((a) => a.validationResult == 'fail').length,
     };
   }
 
@@ -216,10 +172,6 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
 
                         // Certificates Report
                         _buildCertificatesReport(),
-                        const SizedBox(height: 16),
-
-                        // Activity Logs Report
-                        _buildActivityLogsReport(),
                       ],
                     ),
                   ),
@@ -230,24 +182,36 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
 
   Widget _buildStatisticsCards() {
     final certStats = _certificateStats;
-    final activityStats = _activityStats;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        int columns = 2;
-        if (constraints.maxWidth > 600) {
-          columns = 4;
+        // Account for padding: 16px on each side = 32px total
+        final double availableWidth = constraints.maxWidth - 32;
+        int columns = 1;
+        double spacing = 16.0;
+
+        if (constraints.maxWidth > 800) {
+          // Large screens: 3 cards in a row (one per column)
+          columns = 3;
+        } else if (constraints.maxWidth > 600) {
+          // Medium-large screens: 3 cards in a row
+          columns = 3;
         } else if (constraints.maxWidth > 400) {
+          // Medium screens: 2 columns (2 cards on first row, 1 on second)
           columns = 2;
+        } else {
+          // Small screens: 1 column (stacked)
+          columns = 1;
         }
 
-        final double spacing = 12.0;
+        // Calculate item width accounting for spacing between items
         final double itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+            (availableWidth - spacing * (columns - 1)) / columns;
 
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
+          alignment: WrapAlignment.start,
           children: [
             _buildStatCard(
               'Total Certificates',
@@ -270,13 +234,6 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
               Colors.red,
               itemWidth,
             ),
-            _buildStatCard(
-              'Total Validations',
-              activityStats['total']!.toString(),
-              Icons.qr_code_scanner,
-              Colors.orange,
-              itemWidth,
-            ),
           ],
         );
       },
@@ -291,36 +248,42 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
     double width,
   ) {
     return SizedBox(
-      width: width,
+      width: width > 0 ? width : double.infinity,
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(icon, color: color, size: 28),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 value,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: color,
+                  fontSize: 32,
                 ),
               ),
+              const SizedBox(height: 4),
               Text(
                 title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -369,7 +332,7 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
                       Expanded(
                         child: TextField(
                           decoration: const InputDecoration(
-                            hintText: 'Search certificates or activity...',
+                            hintText: 'Search certificates...',
                             prefixIcon: Icon(Icons.search),
                             border: OutlineInputBorder(),
                           ),
@@ -399,14 +362,6 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
                               value: 'expired',
                               child: Text('Expired'),
                             ),
-                            DropdownMenuItem(
-                              value: 'success',
-                              child: Text('Success'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'fail',
-                              child: Text('Failed'),
-                            ),
                           ],
                           onChanged:
                               (value) =>
@@ -432,7 +387,7 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
                     children: [
                       TextField(
                         decoration: const InputDecoration(
-                          hintText: 'Search certificates or activity...',
+                          hintText: 'Search certificates...',
                           prefixIcon: Icon(Icons.search),
                           border: OutlineInputBorder(),
                         ),
@@ -465,14 +420,6 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
                                 DropdownMenuItem(
                                   value: 'expired',
                                   child: Text('Expired'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'success',
-                                  child: Text('Success'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'fail',
-                                  child: Text('Failed'),
                                 ),
                               ],
                               onChanged:
@@ -623,120 +570,6 @@ class _GateCollectorReportsPageState extends State<GateCollectorReportsPage> {
                 icon: const Icon(Icons.qr_code),
                 tooltip: 'View QR Code',
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActivityLogsReport() {
-    final filteredLogs = _filteredActivityLogs;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.history,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Activity Logs Report',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Text(
-                  '${filteredLogs.length} activities',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (filteredLogs.isEmpty)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('No activity logs found'),
-                ),
-              )
-            else
-              ...filteredLogs.map((log) => _buildActivityLogCard(log)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActivityLogCard(ActivityLog log) {
-    final isSuccess = log.validationResult == 'success';
-    final statusColor = isSuccess ? Colors.green : Colors.red;
-    final statusIcon = isSuccess ? Icons.check_circle : Icons.cancel;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(statusIcon, color: statusColor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    log.message,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    'By: ${log.gateCollectorName}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    '${log.timestamp.day}/${log.timestamp.month}/${log.timestamp.year} ${log.timestamp.hour}:${log.timestamp.minute.toString().padLeft(2, '0')}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                log.validationResult.toUpperCase(),
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_role.dart';
 import '../models/user_profile.dart';
+import 'activity_log_service.dart';
 
 class UserService {
   static final SupabaseClient _supabase = Supabase.instance.client;
@@ -133,6 +135,34 @@ class UserService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'email');
 
+      // Log user creation activity
+      try {
+        final currentUser = _supabase.auth.currentUser;
+        if (currentUser != null) {
+          final currentUserRole = await getUserRole(currentUser.id);
+          if (currentUserRole != null) {
+            await ActivityLogService.logActivity(
+              userId: currentUser.id,
+              userRole: currentUserRole.name,
+              action: 'user_created',
+              description:
+                  'User created: $fullName ($email) as ${role.displayName}',
+              referenceId: userId,
+              referenceType: 'user',
+              metadata: {
+                'created_user_email': email,
+                'created_user_name': fullName,
+                'created_user_role': role.name,
+                'is_active': isActive,
+              },
+            );
+          }
+        }
+      } catch (e) {
+        // Don't fail user creation if activity logging fails
+        debugPrint('Failed to log user creation: $e');
+      }
+
       return true;
     } catch (e) {
       // Handle error
@@ -143,11 +173,42 @@ class UserService {
   /// Delete user account (admin only)
   static Future<bool> deleteUser(String userId) async {
     try {
+      // Get user details before deletion for logging
+      final userProfile = await getUserProfile(userId);
+
       // Delete user profile first
       await _supabase.from('user_profiles').delete().eq('user_id', userId);
 
       // Delete auth user
       await _supabase.auth.admin.deleteUser(userId);
+
+      // Log user deletion activity
+      try {
+        final currentUser = _supabase.auth.currentUser;
+        if (currentUser != null) {
+          final currentUserRole = await getUserRole(currentUser.id);
+          if (currentUserRole != null) {
+            await ActivityLogService.logActivity(
+              userId: currentUser.id,
+              userRole: currentUserRole.name,
+              action: 'user_deactivated',
+              description:
+                  'User account deleted: ${userProfile?.fullName ?? 'Unknown'}',
+              referenceId: userId,
+              referenceType: 'user',
+              metadata: {
+                'deleted_user_email': userProfile?.email,
+                'deleted_user_name': userProfile?.fullName,
+                'deleted_user_role': userProfile?.role,
+              },
+            );
+          }
+        }
+      } catch (e) {
+        // Don't fail user deletion if activity logging fails
+        debugPrint('Failed to log user deletion: $e');
+      }
+
       return true;
     } catch (e) {
       return false;
@@ -216,6 +277,34 @@ class UserService {
           .from('user_profiles')
           .update(updateData)
           .eq('user_id', userId);
+
+      // Log user update activity
+      try {
+        final currentUser = _supabase.auth.currentUser;
+        if (currentUser != null) {
+          final currentUserRole = await getUserRole(currentUser.id);
+          if (currentUserRole != null) {
+            await ActivityLogService.logActivity(
+              userId: currentUser.id,
+              userRole: currentUserRole.name,
+              action: 'user_updated',
+              description: 'User profile updated',
+              referenceId: userId,
+              referenceType: 'user',
+              metadata: {
+                'updated_fields': updateData.keys.toList(),
+                'full_name': fullName,
+                'role': role?.name,
+                'is_active': isActive,
+              },
+            );
+          }
+        }
+      } catch (e) {
+        // Don't fail user update if activity logging fails
+        debugPrint('Failed to log user update: $e');
+      }
+
       return true;
     } catch (e) {
       return false;

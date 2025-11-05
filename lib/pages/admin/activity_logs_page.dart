@@ -20,19 +20,20 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
 
   final List<String> _actionTypes = [
     'All Actions',
+    'login',
+    'logout',
+    'Password Changed',
     'fish_product_created',
     'fish_product_updated',
     'fish_product_deleted',
     'order_created',
     'order_paid',
     'receipt_issued',
-    'certificate_validated',
     'user_created',
     'user_updated',
     'user_deactivated',
-    'Password Changed',
-    'login',
-    'logout',
+    'certificate_validated',
+    'system_initialized',
   ];
 
   final List<String> _roleTypes = [
@@ -87,6 +88,12 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
 
   String _formatAction(String action) {
     switch (action) {
+      case 'login':
+        return 'Login';
+      case 'logout':
+        return 'Logout';
+      case 'Password Changed':
+        return 'Password Changed';
       case 'fish_product_created':
         return 'Fish Product Created';
       case 'fish_product_updated':
@@ -99,20 +106,18 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
         return 'Order Paid';
       case 'receipt_issued':
         return 'Receipt Issued';
-      case 'certificate_validated':
-        return 'Certificate Validated';
       case 'user_created':
         return 'User Created';
       case 'user_updated':
         return 'User Updated';
       case 'user_deactivated':
         return 'User Deactivated';
-      case 'login':
-        return 'Login';
-      case 'logout':
-        return 'Logout';
+      case 'certificate_validated':
+        return 'Certificate Validated';
+      case 'system_initialized':
+        return 'System Initialized';
       default:
-        return action;
+        return action.replaceAll('_', ' ').toUpperCase();
     }
   }
 
@@ -135,24 +140,34 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
 
   Color _getActionColor(String action) {
     switch (action) {
-      case 'fish_product_created':
-      case 'order_created':
-      case 'receipt_issued':
-      case 'user_created':
-        return Colors.green;
-      case 'fish_product_updated':
-      case 'user_updated':
-        return Colors.blue;
-      case 'fish_product_deleted':
-      case 'user_deactivated':
-        return Colors.red;
-      case 'order_paid':
-      case 'certificate_validated':
-        return Colors.orange;
       case 'login':
-        return Colors.purple;
+        return Colors.green;
       case 'logout':
         return Colors.grey;
+      case 'Password Changed':
+        return Colors.blue;
+      case 'fish_product_created':
+        return Colors.green;
+      case 'fish_product_updated':
+        return Colors.blue;
+      case 'fish_product_deleted':
+        return Colors.red;
+      case 'order_created':
+        return Colors.orange;
+      case 'order_paid':
+        return Colors.green;
+      case 'receipt_issued':
+        return Colors.purple;
+      case 'user_created':
+        return Colors.green;
+      case 'user_updated':
+        return Colors.blue;
+      case 'user_deactivated':
+        return Colors.red;
+      case 'certificate_validated':
+        return Colors.purple;
+      case 'system_initialized':
+        return Colors.indigo;
       default:
         return Colors.grey;
     }

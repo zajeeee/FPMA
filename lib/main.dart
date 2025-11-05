@@ -23,7 +23,9 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.light,
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: GoogleFonts.poppins().fontFamily,
+        // Use a font family that has comprehensive Unicode coverage to avoid
+        // missing glyph warnings on web (e.g., for currency symbols like ₱).
+        fontFamily: GoogleFonts.notoSans().fontFamily,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1976D2), // Primary blue
           brightness: Brightness.light,

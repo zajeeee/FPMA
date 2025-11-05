@@ -84,7 +84,7 @@ class _DesktopLayout extends StatelessWidget {
                   child: Column(
                     children: [
                       Icon(
-                        Icons.water_drop,
+                        Icons.directions_boat,
                         size: 32,
                         color: Theme.of(context).colorScheme.primary,
                       ),

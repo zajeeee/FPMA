@@ -24,8 +24,8 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
   @override
   void initState() {
     super.initState();
-    // Start scanning immediately
-    _isScanning = true;
+    // Don't start scanning automatically - wait for user to press button
+    _isScanning = false;
 
     // Configure scanner for better QR detection
     cameraController = MobileScannerController(
@@ -33,6 +33,15 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
       facing: CameraFacing.back,
       torchEnabled: false,
     );
+  }
+
+  void _startScanning() {
+    setState(() {
+      _isScanning = true;
+      _lastValidationResult = null;
+      _lastScannedCode = null;
+      _lastScanTime = null;
+    });
   }
 
   @override
@@ -141,7 +150,7 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
         // Add a small delay to ensure QR code is stable
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted && _isScanning && !_isValidating) {
-            _validateCertificateByQr(qrCode);
+            _validateCertificateByQr(qrCode.trim());
           }
         });
         break;
@@ -203,6 +212,116 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
                   MobileScanner(
                     controller: cameraController,
                     onDetect: _onDetect,
+                  ),
+
+                // Start Scanning Button (when not scanning)
+                if (!_isScanning && !_isValidating)
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.1),
+                          Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.05),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // QR Code Icon Container
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 3,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.qr_code_scanner,
+                              size: 64,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Text(
+                            'Ready to Scan',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Tap the button below to start scanning',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 40),
+                          // Start Scan Button
+                          Container(
+                            width: 280,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withValues(alpha: 0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: FilledButton.icon(
+                              onPressed: _startScanning,
+                              icon: const Icon(Icons.qr_code_scanner, size: 28),
+                              label: const Text(
+                                'Start Scanning',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
 
                 // Scanning Overlay
@@ -319,7 +438,7 @@ class _CertificateValidationPageState extends State<CertificateValidationPage> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Automatically scanning for QR codes...',
+                            'Scanning for QR codes...',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,

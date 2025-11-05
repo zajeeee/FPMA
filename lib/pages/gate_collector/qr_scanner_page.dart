@@ -140,7 +140,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
         // Add a small delay to ensure QR code is stable
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted && _isScanning && !_isValidating) {
-            _validateCertificateByQr(qrCode);
+            _validateCertificateByQr(qrCode.trim());
           }
         });
         break;

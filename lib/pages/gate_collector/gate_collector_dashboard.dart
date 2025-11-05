@@ -233,6 +233,10 @@ class _GateCollectorDashboardState extends State<GateCollectorDashboard> {
                         const SizedBox(height: 16),
                         // Quick Actions
                         Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Column(
@@ -243,22 +247,148 @@ class _GateCollectorDashboardState extends State<GateCollectorDashboard> {
                                   style: Theme.of(context).textTheme.titleLarge
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
-                                const SizedBox(height: 16),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) =>
-                                                  const QrScannerPage(),
+                                const SizedBox(height: 20),
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isWide = constraints.maxWidth > 400;
+                                    return Container(
+                                      width: double.infinity,
+                                      height: isWide ? 80 : 70,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.8),
+                                          ],
                                         ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.qr_code_scanner),
-                                    label: const Text('Scan QR Code'),
-                                  ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 8),
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (context) =>
+                                                        const QrScannerPage(),
+                                              ),
+                                            );
+                                          },
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: isWide ? 32 : 24,
+                                              vertical: isWide ? 16 : 12,
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(
+                                                    10,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.qr_code_scanner,
+                                                    color: Colors.white,
+                                                    size: isWide ? 32 : 28,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 16),
+                                                Flexible(
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Scan QR Code',
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .titleLarge
+                                                            ?.copyWith(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize:
+                                                                  isWide
+                                                                      ? 22
+                                                                      : 18,
+                                                            ),
+                                                      ),
+                                                      if (isWide) ...[
+                                                        const SizedBox(
+                                                          height: 2,
+                                                        ),
+                                                        Text(
+                                                          'Validate certificates instantly',
+                                                          style: Theme.of(
+                                                                context,
+                                                              )
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color: Colors
+                                                                    .white
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.9,
+                                                                    ),
+                                                                fontSize: 12,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Icon(
+                                                  Icons.arrow_forward_ios,
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.9),
+                                                  size: isWide ? 20 : 18,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),

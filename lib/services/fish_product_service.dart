@@ -1,8 +1,10 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../models/fish_product.dart';
+import 'activity_log_service.dart';
+import 'user_service.dart';
 
 class FishProductService {
   static final SupabaseClient _supabase = Supabase.instance.client;
@@ -68,6 +70,31 @@ class FishProductService {
               .select()
               .single();
       final created = FishProduct.fromJson(response);
+
+      // Log fish product creation activity
+      try {
+        final userRole = await UserService.getUserRole(inspectorId);
+        if (userRole != null) {
+          await ActivityLogService.logActivity(
+            userId: inspectorId,
+            userRole: userRole.name,
+            action: 'fish_product_created',
+            description: 'Fish product created: $species from $vesselName',
+            referenceId: created.id,
+            referenceType: 'fish_product',
+            metadata: {
+              'species': species,
+              'vessel_name': vesselName,
+              'weight': weight,
+              'size': size,
+              'inspector_name': inspectorName,
+            },
+          );
+        }
+      } catch (e) {
+        // Don't fail creation if activity logging fails
+        debugPrint('Failed to log fish product creation: $e');
+      }
 
       // Create an initial inspection entry (pending)
       try {
@@ -229,6 +256,33 @@ class FishProductService {
 
       await _supabase.from('fish_products').update(updateData).eq('id', id);
 
+      // Log fish product update activity
+      try {
+        final product = await getFishProductById(id);
+        if (product != null) {
+          final userRole = await UserService.getUserRole(product.inspectorId);
+          if (userRole != null) {
+            await ActivityLogService.logActivity(
+              userId: product.inspectorId,
+              userRole: userRole.name,
+              action: 'fish_product_updated',
+              description: 'Fish product updated: ${product.species}',
+              referenceId: id,
+              referenceType: 'fish_product',
+              metadata: {
+                'species': product.species,
+                'vessel_name': product.vesselName,
+                'updated_fields': updateData.keys.toList(),
+                'inspector_name': product.inspectorName,
+              },
+            );
+          }
+        }
+      } catch (e) {
+        // Don't fail update if activity logging fails
+        debugPrint('Failed to log fish product update: $e');
+      }
+
       // If status was updated, append an inspection entry
       if (status != null) {
         try {
@@ -257,8 +311,35 @@ class FishProductService {
     try {
       // Get the product to delete associated image
       final product = await getFishProductById(id);
-      if (product?.imageUrl != null) {
-        await _deleteImage(product!.imageUrl!);
+      if (product != null) {
+        // Log fish product deletion activity
+        try {
+          final userRole = await UserService.getUserRole(product.inspectorId);
+          if (userRole != null) {
+            await ActivityLogService.logActivity(
+              userId: product.inspectorId,
+              userRole: userRole.name,
+              action: 'fish_product_deleted',
+              description:
+                  'Fish product deleted: ${product.species} from ${product.vesselName}',
+              referenceId: id,
+              referenceType: 'fish_product',
+              metadata: {
+                'species': product.species,
+                'vessel_name': product.vesselName,
+                'weight': product.weight,
+                'inspector_name': product.inspectorName,
+              },
+            );
+          }
+        } catch (e) {
+          // Don't fail deletion if activity logging fails
+          debugPrint('Failed to log fish product deletion: $e');
+        }
+
+        if (product.imageUrl != null) {
+          await _deleteImage(product.imageUrl!);
+        }
       }
 
       await _supabase.from('fish_products').delete().eq('id', id);

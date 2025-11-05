@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/payment_models.dart';
 import 'qr_storage_service.dart';
+import 'activity_log_service.dart';
+import 'user_service.dart';
 
 class PaymentService {
   static final SupabaseClient _supabase = Supabase.instance.client;
@@ -46,14 +49,67 @@ class PaymentService {
     try {
       final response =
           await _supabase.from('orders').insert(insertData).select().single();
-      return OrderOfPayment.fromJson(response);
+      final order = OrderOfPayment.fromJson(response);
+
+      // Log order creation activity
+      try {
+        final userRole = await UserService.getUserRole(collectorId);
+        if (userRole != null) {
+          await ActivityLogService.logActivity(
+            userId: collectorId,
+            userRole: userRole.name,
+            action: 'order_created',
+            description: 'Order of Payment created: $orderNumber',
+            referenceId: order.id,
+            referenceType: 'order',
+            metadata: {
+              'order_number': orderNumber,
+              'amount': amount,
+              'quantity': quantity,
+              'collector_name': collectorName,
+              'fish_product_id': fishProductId,
+            },
+          );
+        }
+      } catch (e) {
+        // Don't fail order creation if activity logging fails
+        debugPrint('Failed to log order creation: $e');
+      }
+
+      return order;
     } catch (e) {
       // If quantity column doesn't exist, try without it
       if (e.toString().contains('quantity')) {
         insertData.remove('quantity');
         final response =
             await _supabase.from('orders').insert(insertData).select().single();
-        return OrderOfPayment.fromJson(response);
+        final order = OrderOfPayment.fromJson(response);
+
+        // Log order creation activity
+        try {
+          final userRole = await UserService.getUserRole(collectorId);
+          if (userRole != null) {
+            await ActivityLogService.logActivity(
+              userId: collectorId,
+              userRole: userRole.name,
+              action: 'order_created',
+              description: 'Order of Payment created: $orderNumber',
+              referenceId: order.id,
+              referenceType: 'order',
+              metadata: {
+                'order_number': orderNumber,
+                'amount': amount,
+                'collector_name': collectorName,
+                'fish_product_id': fishProductId,
+              },
+            );
+          }
+        } catch (e) {
+          // Don't fail order creation if activity logging fails
+          debugPrint('Failed to log order creation: $e');
+        }
+
+        return order;
       }
       rethrow;
     }
@@ -112,6 +168,39 @@ class PaymentService {
 
   static Future<void> markOrderPaid(String orderId) async {
     await _supabase.from('orders').update({'status': 'paid'}).eq('id', orderId);
+
+    // Log order payment activity
+    try {
+      // Get order details for logging
+      final orderResponse =
+          await _supabase
+              .from('orders')
+              .select('collector_id, order_number, amount')
+              .eq('id', orderId)
+              .single();
+
+      final userRole = await UserService.getUserRole(
+        orderResponse['collector_id'],
+      );
+      if (userRole != null) {
+        await ActivityLogService.logActivity(
+          userId: orderResponse['collector_id'],
+          userRole: userRole.name,
+          action: 'order_paid',
+          description:
+              'Order of Payment paid: ${orderResponse['order_number']}',
+          referenceId: orderId,
+          referenceType: 'order',
+          metadata: {
+            'order_number': orderResponse['order_number'],
+            'amount': orderResponse['amount'],
+          },
+        );
+      }
+    } catch (e) {
+      // Don't fail payment if activity logging fails
+      debugPrint('Failed to log order payment: $e');
+    }
   }
 
   static Future<List<OfficialReceipt>> getRecentReceipts({
@@ -149,7 +238,33 @@ class PaymentService {
             .select()
             .single();
 
-    return OfficialReceipt.fromJson(response);
+    final receipt = OfficialReceipt.fromJson(response);
+
+    // Log receipt issuance activity
+    try {
+      final userRole = await UserService.getUserRole(tellerId);
+      if (userRole != null) {
+        await ActivityLogService.logActivity(
+          userId: tellerId,
+          userRole: userRole.name,
+          action: 'receipt_issued',
+          description: 'Official Receipt issued: $receiptNumber',
+          referenceId: receipt.id,
+          referenceType: 'receipt',
+          metadata: {
+            'receipt_number': receiptNumber,
+            'amount_paid': amountPaid,
+            'teller_name': tellerName,
+            'order_id': orderId,
+          },
+        );
+      }
+    } catch (e) {
+      // Don't fail receipt creation if activity logging fails
+      debugPrint('Failed to log receipt issuance: $e');
+    }
+
+    return receipt;
   }
 
   // Clearing Certificates

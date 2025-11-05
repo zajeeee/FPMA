@@ -4,6 +4,7 @@ import 'package:toastification/toastification.dart';
 import '../models/user_role.dart';
 import '../services/user_service.dart';
 import '../services/analytics_service.dart';
+import '../services/logout_service.dart';
 import '../pages/auth/login_page.dart';
 import 'responsive_navigation.dart';
 import '../pages/admin/admin_dashboard.dart';
@@ -191,18 +192,7 @@ class _ResponsiveDashboardWrapperState
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder:
-              (context, animation, secondaryAnimation) => const LoginPage(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-        ),
-      );
-    }
+    await LogoutService.logout(context);
   }
 
   Future<void> _showLogoutConfirmation() async {
@@ -669,34 +659,98 @@ class AdminAnalyticsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Blue Header Bar
+        // Enhanced Header with Gradient
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Text(
             'Analytics',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
             textAlign: TextAlign.center,
           ),
         ),
         // Page Content
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // Analytics Overview Card
-                const AnalyticsCard(),
-                const SizedBox(height: 16),
-                // Additional analytics widgets can be added here
-                _buildAdditionalStats(context),
-              ],
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.grey.shade50, Colors.white],
+              ),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = constraints.maxWidth < 600;
+                  final isTablet =
+                      constraints.maxWidth >= 600 &&
+                      constraints.maxWidth < 1200;
+                  final isDesktop = constraints.maxWidth >= 1200;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Quick Stats Section - Top Row
+                      _buildQuickStatsSection(
+                        context,
+                        stats: null,
+                        isMobile: isMobile,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Analytics Charts Section
+                      if (isDesktop || isTablet)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(flex: 2, child: const AnalyticsCard()),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              flex: 1,
+                              child: _buildAdditionalStats(
+                                context,
+                                isMobile: false,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          children: [
+                            const AnalyticsCard(),
+                            const SizedBox(height: 20),
+                            _buildAdditionalStats(context, isMobile: true),
+                          ],
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -704,13 +758,333 @@ class AdminAnalyticsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAdditionalStats(BuildContext context) {
+  Widget _buildQuickStatsSection(
+    BuildContext context, {
+    Map<String, dynamic>? stats,
+    required bool isMobile,
+  }) {
     return FutureBuilder<Map<String, dynamic>>(
       future: AnalyticsService.getDashboardStats(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Card(
-            child: Padding(
+          return _buildQuickStatsLoading(context, isMobile);
+        }
+
+        if (snapshot.hasError) {
+          return _buildQuickStatsError(
+            context,
+            snapshot.error.toString(),
+            isMobile,
+          );
+        }
+
+        final stats = snapshot.data ?? {};
+        return _buildQuickStatsContent(context, stats, isMobile);
+      },
+    );
+  }
+
+  Widget _buildQuickStatsLoading(BuildContext context, bool isMobile) {
+    return Card(
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, Colors.grey.shade50],
+          ),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+
+  Widget _buildQuickStatsError(
+    BuildContext context,
+    String error,
+    bool isMobile,
+  ) {
+    return Card(
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'Error loading statistics',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                error,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStatsContent(
+    BuildContext context,
+    Map<String, dynamic> stats,
+    bool isMobile,
+  ) {
+    final quickStats = [
+      {
+        'title': 'Total Inspections',
+        'value': '${stats['total_inspections'] ?? 0}',
+        'icon': Icons.assignment,
+        'color': Colors.blue,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Total Orders',
+        'value': '${stats['total_orders'] ?? 0}',
+        'icon': Icons.shopping_cart,
+        'color': Colors.green,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Total Users',
+        'value': '${stats['total_users'] ?? 0}',
+        'icon': Icons.people,
+        'color': Colors.purple,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Revenue',
+        'value':
+            '₱${(stats['total_payments_collected'] ?? 0).toStringAsFixed(0)}',
+        'icon': Icons.payment,
+        'color': Colors.deepPurple,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Total Receipts',
+        'value': '${stats['total_receipts'] ?? 0}',
+        'icon': Icons.receipt,
+        'color': Colors.orange,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Today\'s Inspections',
+        'value': '${stats['today_inspections'] ?? 0}',
+        'icon': Icons.today,
+        'color': Colors.teal,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+      {
+        'title': 'Active Vessels',
+        'value': '${stats['active_vessels_today'] ?? 0}',
+        'icon': Icons.directions_boat,
+        'color': Colors.indigo,
+        'gradient': [Colors.blue.shade400, Colors.blue.shade600],
+      },
+    ];
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildQuickStatCard(context, quickStats[0])),
+              const SizedBox(width: 12),
+              Expanded(child: _buildQuickStatCard(context, quickStats[1])),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildQuickStatCard(context, quickStats[2])),
+              const SizedBox(width: 12),
+              Expanded(child: _buildQuickStatCard(context, quickStats[3])),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildQuickStatCard(context, quickStats[4])),
+              const SizedBox(width: 12),
+              Expanded(child: _buildQuickStatCard(context, quickStats[5])),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildQuickStatCard(context, quickStats[6])),
+              const SizedBox(width: 12),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[0]),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[1]),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[2]),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[3]),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[4]),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[5]),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _buildQuickStatCard(context, quickStats[6]),
+              ),
+            ),
+            const Expanded(child: SizedBox()),
+            const Expanded(child: SizedBox()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickStatCard(BuildContext context, Map<String, dynamic> stat) {
+    final Color baseColor =
+        stat['color'] as Color? ?? Theme.of(context).colorScheme.primary;
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          border: Border.all(
+            color: baseColor.withValues(alpha: 0.15),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: baseColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    stat['icon'] as IconData,
+                    color: baseColor,
+                    size: 22,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: baseColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.trending_up, color: baseColor, size: 14),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              stat['value'] as String,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: baseColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              stat['title'] as String,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdditionalStats(BuildContext context, {required bool isMobile}) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: AnalyticsService.getDashboardStats(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Card(
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -719,14 +1093,25 @@ class AdminAnalyticsPage extends StatelessWidget {
 
         if (snapshot.hasError) {
           return Card(
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Center(
-                child: Text(
-                  'Error loading statistics: ${snapshot.error}',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.red),
+                child: Column(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red, size: 32),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Error loading statistics',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -735,69 +1120,74 @@ class AdminAnalyticsPage extends StatelessWidget {
 
         final stats = snapshot.data ?? {};
         return Card(
-          child: Padding(
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
             padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.grey.shade50],
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'System Statistics',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 2.5,
+                Row(
                   children: [
-                    _buildStatCard(
-                      context,
-                      'Total Inspections',
-                      '${stats['total_inspections'] ?? 0}',
-                      Icons.assignment,
-                      Colors.blue,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.analytics,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 24,
+                      ),
                     ),
-                    _buildStatCard(
-                      context,
-                      'Total Orders',
-                      '${stats['total_orders'] ?? 0}',
-                      Icons.shopping_cart,
-                      Colors.green,
-                    ),
-                    _buildStatCard(
-                      context,
-                      'Total Receipts',
-                      '${stats['total_receipts'] ?? 0}',
-                      Icons.receipt,
-                      Colors.orange,
-                    ),
-                    _buildStatCard(
-                      context,
-                      'Total Users',
-                      '${stats['total_users'] ?? 0}',
-                      Icons.people,
-                      Colors.purple,
-                    ),
-                    _buildStatCard(
-                      context,
-                      'Today\'s Inspections',
-                      '${stats['today_inspections'] ?? 0}',
-                      Icons.today,
-                      Colors.teal,
-                    ),
-                    _buildStatCard(
-                      context,
-                      'Active Vessels Today',
-                      '${stats['active_vessels_today'] ?? 0}',
-                      Icons.directions_boat,
-                      Colors.indigo,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'System Statistics',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 20),
+                _buildStatItem(
+                  context,
+                  'Today\'s Inspections',
+                  '${stats['today_inspections'] ?? 0}',
+                  Icons.today,
+                  Colors.teal,
+                ),
+                const SizedBox(height: 12),
+                _buildStatItem(
+                  context,
+                  'Active Vessels',
+                  '${stats['active_vessels_today'] ?? 0}',
+                  Icons.directions_boat,
+                  Colors.indigo,
+                ),
+                const SizedBox(height: 12),
+                _buildStatItem(
+                  context,
+                  'Total Receipts',
+                  '${stats['total_receipts'] ?? 0}',
+                  Icons.receipt,
+                  Colors.orange,
                 ),
               ],
             ),
@@ -807,7 +1197,7 @@ class AdminAnalyticsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(
+  Widget _buildStatItem(
     BuildContext context,
     String title,
     String value,
@@ -817,40 +1207,40 @@ class AdminAnalyticsPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   value,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: color,
+                    fontSize: 22,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   title,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
